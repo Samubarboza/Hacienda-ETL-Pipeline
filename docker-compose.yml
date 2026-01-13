@@ -78,6 +78,8 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/sql:/opt/airflow/sql
+
     command: webserver
     restart: unless-stopped
     healthcheck:
@@ -102,6 +104,7 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/sql:/opt/airflow/sql
       - ./airflow/plugins:/opt/airflow/plugins
     command: scheduler
     restart: unless-stopped
