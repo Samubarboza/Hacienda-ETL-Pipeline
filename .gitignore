@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# Airflow
+airflow/logs/
+airflow/__pycache__/
+airflow/*.cfg
+airflow/airflow.db
+airflow/webserver_config.py
+
+# Docker
+docker/**/data/
+docker/**/logs/
+*.log
+
+# SQL Server / Databases
+*.mdf
+*.ldf
+*.bak
+
+# Databricks
+.databricks/
+*.dbc
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Temporary / Generated
+tmp/
+temp/
