@@ -1,4 +1,6 @@
 -- Crea schemas base del DWH
+USE hacienda_dw;
+
 IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'raw')
     EXEC('CREATE SCHEMA raw');
 

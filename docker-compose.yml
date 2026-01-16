@@ -23,7 +23,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: hacienda_sqlserver
     environment:
-      SA_PASSWORD: StrongPassword123Abc
+      SA_PASSWORD: ${SQLSERVER_SA_PASSWORD}
       ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
@@ -35,8 +35,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 90s
-    depends_on:
-      - airflow-db
 
   airflow-init:
     build:

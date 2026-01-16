@@ -1,4 +1,3 @@
-# airflow/dags/02_ingest_deuda_publica_dag.py
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
@@ -10,7 +9,7 @@ def ingest(**context):
     loader.load_all()
 
 with DAG(
-    dag_id="02_ingest_deuda_publica_raw",
+    dag_id="03_ingest_deuda_publica_raw",
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,

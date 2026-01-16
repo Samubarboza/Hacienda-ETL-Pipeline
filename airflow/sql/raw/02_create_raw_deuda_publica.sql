@@ -1,9 +1,11 @@
+USE hacienda_dw;
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.tables t
     JOIN sys.schemas s ON t.schema_id = s.schema_id
     WHERE t.name = 'raw_deuda_publica'
-    AND s.name = 'raw'
+        AND s.name = 'raw'
 )
 BEGIN
     CREATE TABLE raw.raw_deuda_publica (

@@ -38,10 +38,12 @@ class RawDeudaPublicaLoader:
         request_hash = hashlib.sha256(raw.encode()).hexdigest()
 
         sql = """
+        USE hacienda_dw;
+        
         INSERT INTO raw.raw_deuda_publica
             (payload, source_system, execution_date, page_number, request_hash)
         VALUES
-            (%s, %s, %s, %s, %s)
-        """
+            (%s, %s, %s, %s, %s)"""
+
     # ejecutamos el INSERT contra SQL Server
         self.hook.run(sql, parameters=(json.dumps(data, ensure_ascii=False), "odmh_hacienda_py", self.execution_date, page, request_hash), autocommit=True)
