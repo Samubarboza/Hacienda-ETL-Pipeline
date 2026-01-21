@@ -1,19 +1,20 @@
 # deuda_publica/api_client.py
-import json
-import ssl
-from urllib.request import urlopen
+import logging
+import requests
 
-# URL base de la api
+logger = logging.getLogger(__name__)
+
 BASE_URL = "https://datos.hacienda.gov.py/odmh-api-v1/rest/api/v1/deudaPublica/deuda"
+TIMEOUT_SECONDS = 30
 
-# obtenemos una página específica de la API y devuelve el JSON como dict
 def fetch_page(page: int) -> dict:
-    url = f"{BASE_URL}?page={page}"
+    params = {"page": page}
 
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    try:
+        response = requests.get(BASE_URL, params=params, timeout=TIMEOUT_SECONDS)
+        response.raise_for_status()
+        return response.json()
 
-    # ejecuta la request HTTP y parsea la respuesta JSON
-    with urlopen(url, context=context, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    except requests.RequestException as exc:
+        logger.error("Error fetching page %s from Deuda Pública API: %s", page, exc)
+        raise

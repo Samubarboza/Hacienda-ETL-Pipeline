@@ -1,5 +1,7 @@
 apache-airflow-providers-microsoft-mssql==3.7.2
+apache-airflow-providers-databricks
 pyodbc
 requests
 python-dotenv
-apache-airflow-providers-databricks
+azure-storage-blob
+azure-identity

@@ -1,49 +1,135 @@
+# deuda_publica/raw_loader.py
 import json
 import logging
 import hashlib
-from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
+import os
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.core.exceptions import ResourceNotFoundError
+from azure.identity import ClientSecretCredential
+
 from deuda_publica.api_client import fetch_page
 
-# logger para registrar eventos del proceso en Airflow
 logger = logging.getLogger(__name__)
 
-MAX_PAGES = 167
+MAX_PAGES = 3  # para pruebas (luego 167 o parametrizable)
+RAW_CONTAINER = "raw"
+SOURCE_SYSTEM = "odmh_hacienda_py"
 
-# Clase responsable de cargar datos crudos de la API a la tabla RAW
+
 class RawDeudaPublicaLoader:
+    def __init__(self, execution_date: str, *, container: str = RAW_CONTAINER, max_pages: int = MAX_PAGES, overwrite: bool = False, ) -> None:
+        self.execution_date = _validate_execution_date(execution_date)
+        self.container = container
+        self.max_pages = int(max_pages)
+        self.overwrite = overwrite
 
-    # inicializa fecha de ejecución, conexión a SQL Server y cliente de la API
-    def __init__(self, execution_date):
-        self.execution_date = execution_date
-        self.hook = MsSqlHook(mssql_conn_id="sqlserver_hacienda")
+        self._blob_service = _build_blob_service_client()
 
-    # recorre todas las páginas de la API y carga cada una en la tabla RAW
-    def load_all(self):
-        for page in range(1, MAX_PAGES + 1):
+    def load_all(self) -> None:
+        container_client = self._blob_service.get_container_client(self.container)
+
+        # asegura container (si no existe, lo crea)
+        self._ensure_container(container_client)
+
+        for page in range(1, self.max_pages + 1):
             data = fetch_page(page)
-            results = data.get("results", [])
+            results = data.get("results") or []
 
             if not results:
-                logger.info(f"Página {page} sin resultados. Corte.")
+                logger.info("Página %s sin resultados. Corte.", page)
                 break
 
-            # inserta el JSON completo en la tabla RAW
-            self._insert(page, data)
-            logger.info(f"Página {page} cargada ({len(results)} registros)")
+            blob_path = self._raw_blob_path(page)
+            request_hash = self._request_hash(page)
 
-    # insertamos el payload JSON con metadatos e idempotencia
-    def _insert(self, page: int, data):
-        # Genera un hash único por página y fecha de ejecución
-        raw = f"deuda_publica|page={page}|execution_date={self.execution_date}"
-        request_hash = hashlib.sha256(raw.encode()).hexdigest()
+            if not self.overwrite and self._blob_exists(container_client, blob_path):
+                logger.info("RAW ya existe (skip): %s", blob_path)
+                continue
 
-        sql = """
-        USE hacienda_dw;
-        
-        INSERT INTO raw.raw_deuda_publica
-            (payload, source_system, execution_date, page_number, request_hash)
-        VALUES
-            (%s, %s, %s, %s, %s)"""
+            payload_bytes = _json_bytes(data)
 
-    # ejecutamos el INSERT contra SQL Server
-        self.hook.run(sql, parameters=(json.dumps(data, ensure_ascii=False), "odmh_hacienda_py", self.execution_date, page, request_hash), autocommit=True)
+            metadata = self._build_metadata(page=page, request_hash=request_hash)
+
+            container_client.upload_blob(
+                name=blob_path,
+                data=payload_bytes,
+                overwrite=self.overwrite,
+                metadata=metadata,
+                content_settings=ContentSettings(content_type="application/json; charset=utf-8"), )
+
+            logger.info("Página %s guardada en ADLS (%s registros) -> %s", page, len(results), blob_path, )
+
+    def _raw_blob_path(self, page: int) -> str:
+        return f"deuda_publica/execution_date={self.execution_date}/page={page:03d}.json"
+
+    def _request_hash(self, page: int) -> str:
+        raw = f"{SOURCE_SYSTEM}|endpoint=deuda_publica|page={page}|execution_date={self.execution_date}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _build_metadata(self, *, page: int, request_hash: str) -> Dict[str, str]:
+        ingestion_ts = datetime.now(timezone.utc).isoformat()
+        return {
+            "source_system": SOURCE_SYSTEM,
+            "execution_date": self.execution_date,
+            "page_number": str(page),
+            "request_hash": request_hash,
+            "ingestion_timestamp_utc": ingestion_ts,
+        }
+
+    @staticmethod
+    def _blob_exists(container_client, blob_path: str) -> bool:
+        return container_client.get_blob_client(blob_path).exists()
+
+    @staticmethod
+    def _ensure_container(container_client) -> None:
+        try:
+            container_client.get_container_properties()
+        except ResourceNotFoundError:
+            container_client.create_container()
+            logger.info("Container creado: %s", container_client.container_name)
+
+
+def _build_blob_service_client() -> BlobServiceClient:
+    conn_str = _get_env("AZURE_STORAGE_CONNECTION_STRING")
+    if conn_str:
+        return BlobServiceClient.from_connection_string(conn_str)
+
+    tenant_id = _require_env("AZURE_TENANT_ID")
+    client_id = _require_env("AZURE_CLIENT_ID")
+    client_secret = _require_env("AZURE_CLIENT_SECRET")
+    account_name = _require_env("AZURE_STORAGE_ACCOUNT")
+
+    credential = ClientSecretCredential(
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret, )
+
+    account_url = f"https://{account_name}.blob.core.windows.net"
+    return BlobServiceClient(account_url=account_url, credential=credential)
+
+
+def _validate_execution_date(execution_date: str) -> str:
+    try:
+        datetime.strptime(execution_date, "%Y-%m-%d")
+        return execution_date
+    except ValueError as exc:
+        raise ValueError(f"execution_date inválida (esperado YYYY-MM-DD): {execution_date}") from exc
+
+
+def _json_bytes(data: Dict[str, Any]) -> bytes:
+    return json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+
+def _get_env(name: str) -> Optional[str]:
+    value = os.getenv(name)
+    return value.strip() if value and value.strip() else None
+
+
+def _require_env(name: str) -> str:
+    value = _get_env(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value

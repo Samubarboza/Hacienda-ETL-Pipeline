@@ -9,7 +9,7 @@ def ingest(**context):
     loader.load_all()
 
 with DAG(
-    dag_id="03_ingest_deuda_publica_raw",
+    dag_id="02_ingest_deuda_publica_raw",
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
@@ -18,5 +18,6 @@ with DAG(
 
     PythonOperator(
         task_id="ingest_raw_deuda_publica",
-        python_callable=ingest
+        python_callable=ingest,
+        provide_context=True
     )
