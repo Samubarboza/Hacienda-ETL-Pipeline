@@ -1,7 +1,7 @@
 from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
 from airflow.exceptions import AirflowException
 from datetime import datetime, timezone
-from deuda_publica.audit_log import AuditLogger
+
 
 DATASET_NAME = "deuda_publica"
 TOTAL_PAGES = 166 # para pruebas modificamos el total page a 167
