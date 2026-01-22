@@ -16,3 +16,12 @@ with DAG(
         mssql_conn_id="sqlserver_hacienda",
         sql="schemas/01_create_schemas.sql",
     )
+    
+    create_audit_schema = MsSqlOperator(
+    task_id="create_audit_schema",
+    mssql_conn_id="sqlserver_hacienda",
+    sql="schemas/02_create_audit_schema.sql",
+    )
+
+    create_schemas >> create_audit_schema
+

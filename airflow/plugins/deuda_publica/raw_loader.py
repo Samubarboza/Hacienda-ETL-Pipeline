@@ -14,7 +14,7 @@ from deuda_publica.api_client import fetch_page
 
 logger = logging.getLogger(__name__)
 
-MAX_PAGES = 3  # para pruebas (luego 167 o parametrizable)
+MAX_PAGES = 166  # para pruebas (luego 167 o parametrizable)
 RAW_CONTAINER = "raw"
 SOURCE_SYSTEM = "odmh_hacienda_py"
 
