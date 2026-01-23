@@ -1,100 +1,103 @@
-from airflow.providers.microsoft.mssql.hooks.mssql import MsSqlHook
-from airflow.exceptions import AirflowException
+import json
 from datetime import datetime, timezone
+from airflow.exceptions import AirflowException
+from azure.storage.filedatalake import DataLakeServiceClient
+from azure.identity import ClientSecretCredential
 
 
 DATASET_NAME = "deuda_publica"
-TOTAL_PAGES = 166 # para pruebas modificamos el total page a 167
+TOTAL_PAGES = 166  # pAginas reales de la API
 
 class RawDeudaPublicaValidator:
-    def __init__(self, execution_date: str, mssql_conn_id: str = "sqlserver_hacienda"):
-        self.execution_date = execution_date
-        self.hook = MsSqlHook(mssql_conn_id=mssql_conn_id)
-        self.audit = AuditLogger(mssql_conn_id=mssql_conn_id)
+    def __init__(self, storage_account_url: str, file_system_name: str, credential, raw_base_path: str = "deuda_publica", ):
+        # base path del dataset RAW
+        self.raw_base_path = raw_base_path
 
-    def _get_loaded_pages(self) -> set[int]:
-        sql = """
-        USE hacienda_dw;
-        
-        SELECT DISTINCT page_number
-        FROM raw.raw_deuda_publica
-        WHERE execution_date = %s
-        """
-        rows = self.hook.get_records(sql, parameters=(self.execution_date,))
-        return {int(r[0]) for r in rows}
+        # credencial Azure (Service Principal)
+        self.credential = ClientSecretCredential(
+            tenant_id=credential["tenant_id"],
+            client_id=credential["client_id"],
+            client_secret=credential["client_secret"],
+        )
 
-    def _get_row_count(self) -> int:
-        sql = """
-        USE hacienda_dw;
-        
-        SELECT COUNT(*)
-        FROM raw.raw_deuda_publica
-        WHERE execution_date = %s
-        """
-        return int(self.hook.get_first(sql, parameters=(self.execution_date,))[0])
+        # cliente del Data Lake
+        self.service_client = DataLakeServiceClient(account_url=storage_account_url, credential=self.credential,)
 
+        # filesystem (container)
+        self.fs_client = self.service_client.get_file_system_client(file_system=file_system_name)
+
+
+    def _get_latest_execution_date(self) -> str:
+        paths = self.fs_client.get_paths(path=self.raw_base_path)
+
+        execution_dates = []
+
+        for p in paths:
+            if p.is_directory and "execution_date=" in p.name:
+                execution_dates.append(p.name.split("execution_date=")[-1])
+
+        if not execution_dates:
+            raise AirflowException("No se encontraron particiones RAW para deuda_publica")
+
+        return max(execution_dates)
+
+
+    # lista todos los archivos raw, excluye carpetas
+    def _list_raw_files(self) -> list:
+        paths = self.fs_client.get_paths(path=self.raw_path)
+        files = [p for p in paths if not p.is_directory]
+        return files
+
+    # extrae el numero de pagina desde el nombre del archivo
+    def _extract_page_number(self, file_path: str) -> int:
+        # Ejemplo real: page=001.json
+        name = file_path.split("/")[-1]
+        page_str = name.replace("page=", "").replace(".json", "")
+        return int(page_str)
+
+
+    # valida integridad completa del raw o falla el dag
     def validate_or_fail(self) -> None:
         started = datetime.now(timezone.utc)
+        execution_date = self._get_latest_execution_date()
+        self.raw_path = f"{self.raw_base_path}/execution_date={execution_date}"
 
-        self.audit.ensure_table()
+        # obtenemos la lista de archivos raw
+        files = self._list_raw_files()
 
-        status = "SUCCESS"
-        error_message = None
-        missing_pages_str = None
+        if not files:
+            raise AirflowException(f"No se encontraron archivos RAW en {self.raw_path}")
 
-        try:
-            loaded_pages = self._get_loaded_pages()
-            rows_loaded = self._get_row_count()
+        pages_loaded = set()
+        empty_files = []
 
-            if rows_loaded <= 0:
-                raise AirflowException("RAW vacío para execution_date (rows_loaded=0).")
+        # recorremos cada archivo raw 
+        for file in files:
+            file_client = self.fs_client.get_file_client(file.name)
+            content = file_client.download_file().readall()
 
-            expected_pages = set(range(1, TOTAL_PAGES + 1))
-            missing_pages = sorted(list(expected_pages - loaded_pages))
-
-            if missing_pages:
-                missing_pages_str = ",".join(map(str, missing_pages[:50]))
-                extra = "" if len(missing_pages) <= 50 else f"...(+{len(missing_pages)-50})"
-                raise AirflowException(
-                    f"RAW incompleto: faltan {len(missing_pages)} páginas. Ej: {missing_pages_str}{extra}"
-                )
-
-            ended = datetime.now(timezone.utc)
-            self.audit.log_run(
-                pipeline_name="airflow_raw_validation",
-                dataset_name=DATASET_NAME,
-                execution_date=self.execution_date,
-                status=status,
-                started_at_utc=started.isoformat(),
-                ended_at_utc=ended.isoformat(),
-                pages_expected=TOTAL_PAGES,
-                pages_loaded=len(loaded_pages),
-                rows_loaded=rows_loaded,
-                missing_pages=None,
-                error_message=None,
-            )
-
-        except Exception as e:
-            status = "FAILED"
-            error_message = str(e)
-            ended = datetime.now(timezone.utc)
-
-            # Intento de auditoría incluso si falla
+            if not content:
+                empty_files.append(file.name)
+                continue
+            # validamos que el contenido sea JSON válido
             try:
-                loaded_pages = self._get_loaded_pages()
-                rows_loaded = self._get_row_count()
-                self.audit.log_run(
-                    pipeline_name="airflow_raw_validation",
-                    dataset_name=DATASET_NAME,
-                    execution_date=self.execution_date,
-                    status=status,
-                    started_at_utc=started.isoformat(),
-                    ended_at_utc=ended.isoformat(),
-                    pages_expected=TOTAL_PAGES,
-                    pages_loaded=len(loaded_pages),
-                    rows_loaded=rows_loaded,
-                    missing_pages=missing_pages_str,
-                    error_message=error_message,
-                )
-            finally:
-                raise
+                json.loads(content)
+            except json.JSONDecodeError:
+                raise AirflowException(f"Archivo JSON inválido: {file.name}")
+
+            pages_loaded.add(self._extract_page_number(file.name))
+
+        if empty_files:
+            raise AirflowException(f"Archivos vacíos detectados: {empty_files}")
+
+    # calculamos páginas esperadas vs cargadas
+        expected_pages = set(range(1, TOTAL_PAGES + 1))
+        missing_pages = sorted(expected_pages - pages_loaded)
+
+        if missing_pages:
+            raise AirflowException(f"RAW incompleto. Páginas faltantes: {missing_pages}")
+
+        ended = datetime.now(timezone.utc)
+
+        # Si llegó hasta acá - VALIDACION OK
+        return
