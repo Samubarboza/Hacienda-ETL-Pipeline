@@ -21,7 +21,7 @@ DATABRICKS_JOB_JSON = {
             "task_key": "transform_staging_to_curated",
             "existing_cluster_id": "0124-102720-469koryx",
             "notebook_task": {
-                "notebook_path": "/Users/samu_junior95@hotmail.com/02_stg_to_curated_deuda_publica",
+                "notebook_path": "/Users/samu_junior95@hotmail.com/02_stg_to_curated_deuda_publica.py",
                 "base_parameters": {
                     "execution_date": "{{ ds }}",
                     "staging_container": "staging",

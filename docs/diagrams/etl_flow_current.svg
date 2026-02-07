@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Hacienda ETL Flow - Current Architecture</title>
+  <desc id="desc">Current pipeline from API to raw, staging and curated with Airflow, Databricks and audit outputs.</desc>
+
+  <defs>
+    <style>
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .label { font: 600 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .small { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .box { stroke: #1e293b; stroke-width: 2; rx: 12; }
+      .orchestrator { fill: #e0f2fe; }
+      .source { fill: #fff7ed; }
+      .raw { fill: #fee2e2; }
+      .quality { fill: #fde68a; }
+      .staging { fill: #dbeafe; }
+      .curated { fill: #dcfce7; }
+      .audit { fill: #ede9fe; }
+      .infra { fill: #f1f5f9; }
+      .line { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .line-dashed { stroke: #64748b; stroke-width: 2.2; stroke-dasharray: 8 6; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="980" fill="#f8fafc"/>
+
+  <text x="60" y="70" class="title">Hacienda ETL Pipeline - Current Architecture (Up to Curated)</text>
+  <text x="60" y="105" class="subtitle">Implemented flow: API ingestion, raw validation, staging and curated transformation, ADLS/SQL auditing</text>
+
+  <!-- Orchestrator -->
+  <rect x="520" y="150" width="560" height="90" class="box orchestrator"/>
+  <text x="560" y="205" class="label">Airflow Orchestration (DAG 00 -> DAG 05)</text>
+
+  <!-- Source -->
+  <rect x="60" y="320" width="230" height="110" class="box source"/>
+  <text x="90" y="365" class="label">ODMH API</text>
+  <text x="90" y="392" class="small">Deuda Publica source</text>
+
+  <!-- Raw -->
+  <rect x="360" y="300" width="300" height="140" class="box raw"/>
+  <text x="390" y="350" class="label">ADLS Raw</text>
+  <text x="390" y="376" class="small">deuda_publica/execution_date=YYYY-MM-DD</text>
+  <text x="390" y="402" class="small">DAG 02 ingest</text>
+
+  <!-- Validation -->
+  <rect x="740" y="300" width="300" height="140" class="box quality"/>
+  <text x="770" y="350" class="label">Raw Validation</text>
+  <text x="770" y="376" class="small">DAG 03 quality checks</text>
+  <text x="770" y="402" class="small">Fail-fast on invalid raw</text>
+
+  <!-- Staging -->
+  <rect x="1120" y="300" width="300" height="140" class="box staging"/>
+  <text x="1150" y="350" class="label">ADLS Staging</text>
+  <text x="1150" y="376" class="small">raw -> staging with Databricks</text>
+  <text x="1150" y="402" class="small">DAG 04</text>
+
+  <!-- Curated -->
+  <rect x="1120" y="520" width="300" height="140" class="box curated"/>
+  <text x="1150" y="570" class="label">ADLS Curated</text>
+  <text x="1150" y="596" class="small">staging -> curated with business rules</text>
+  <text x="1150" y="622" class="small">DAG 05</text>
+
+  <!-- Databricks -->
+  <rect x="740" y="520" width="300" height="140" class="box infra"/>
+  <text x="770" y="570" class="label">Databricks Notebooks</text>
+  <text x="770" y="596" class="small">01_raw_to_stg_deuda_publica</text>
+  <text x="770" y="622" class="small">02_stg_to_curated_deuda_publica</text>
+
+  <!-- ADLS Logs -->
+  <rect x="360" y="700" width="300" height="140" class="box audit"/>
+  <text x="390" y="750" class="label">ADLS Logs (JSON)</text>
+  <text x="390" y="776" class="small">logs/deuda_publica/...</text>
+  <text x="390" y="802" class="small">validation + curated audit</text>
+
+  <!-- SQL Audit -->
+  <rect x="740" y="700" width="300" height="140" class="box audit"/>
+  <text x="770" y="750" class="label">SQL Audit</text>
+  <text x="770" y="776" class="small">audit.etl_run_log</text>
+  <text x="770" y="802" class="small">audit.pipeline_runs</text>
+
+  <!-- Bootstrap SQL -->
+  <rect x="1120" y="700" width="300" height="140" class="box infra"/>
+  <text x="1150" y="750" class="label">SQL Bootstrap</text>
+  <text x="1150" y="776" class="small">DAG 00 / DAG 01</text>
+  <text x="1150" y="802" class="small">warehouse + schemas + audit tables</text>
+
+  <!-- Main flow arrows -->
+  <path d="M290 375 L360 375" class="line"/>
+  <path d="M660 375 L740 375" class="line"/>
+  <path d="M1040 375 L1120 375" class="line"/>
+
+  <!-- Databricks connections -->
+  <path d="M1038 560 L1120 560" class="line"/>
+  <path d="M890 520 L890 440" class="line-dashed"/>
+  <path d="M960 520 L1120 440" class="line-dashed"/>
+
+  <!-- Curated data path -->
+  <path d="M1270 440 L1270 520" class="line"/>
+
+  <!-- Audit arrows -->
+  <path d="M890 440 L890 700" class="line-dashed"/>
+  <path d="M890 660 L660 760" class="line-dashed"/>
+  <path d="M1270 660 L1040 760" class="line-dashed"/>
+
+  <!-- Orchestrator links -->
+  <path d="M800 240 L800 300" class="line-dashed"/>
+  <path d="M960 240 L1270 300" class="line-dashed"/>
+  <path d="M640 240 L460 300" class="line-dashed"/>
+
+  <!-- Legend -->
+  <rect x="60" y="880" width="16" height="16" class="box source"/>
+  <text x="84" y="894" class="small">Source</text>
+  <rect x="180" y="880" width="16" height="16" class="box raw"/>
+  <text x="204" y="894" class="small">Raw</text>
+  <rect x="280" y="880" width="16" height="16" class="box quality"/>
+  <text x="304" y="894" class="small">Validation</text>
+  <rect x="420" y="880" width="16" height="16" class="box staging"/>
+  <text x="444" y="894" class="small">Staging</text>
+  <rect x="540" y="880" width="16" height="16" class="box curated"/>
+  <text x="564" y="894" class="small">Curated</text>
+  <rect x="660" y="880" width="16" height="16" class="box audit"/>
+  <text x="684" y="894" class="small">Audit</text>
+  <rect x="760" y="880" width="16" height="16" class="box orchestrator"/>
+  <text x="784" y="894" class="small">Orchestration</text>
+</svg>

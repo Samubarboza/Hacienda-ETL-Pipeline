@@ -1,81 +1,165 @@
-# Initial Configuration - Hacienda ETL Pipeline
+# Hacienda ETL Pipeline
 
-## 1. SQL Server Connection in Airflow
+Production-oriented ETL pipeline for `deuda_publica`, orchestrated in Airflow, transformed in Databricks, and persisted in ADLS Gen2.
 
-Access the Airflow UI at `http://localhost:8080`
+## Current Status
+The project is under active development and currently delivers an end-to-end flow up to the `curated` layer.
 
-**Admin → Connections → Create New Connection**
+## High-Level Architecture
 
-Fill in with these values:
+![Current ETL Flow](docs/diagrams/etl_flow_current.svg)
 
-| Field | Value |
-|-------|-------|
-| Connection ID | `sqlserver_hacienda` |
-| Connection Type | `Microsoft SQL Server` |
-| Host | `sqlserver` |
-| Schema | `master` |
-| Login | `sa` |
-| Password | `StrongPassword123Abc` |
-| Port | `1433` |
-| Extra | (empty) |
+### Flow Summary
+`ODMH API -> ADLS Raw -> Raw Validation -> ADLS Staging -> ADLS Curated -> Audit (ADLS JSON + SQL)`
 
-**Save the connection**
+## Implemented Scope (Current)
+- Ingestion from source API to ADLS raw.
+- Raw quality validation with fail-fast behavior.
+- Raw-to-staging transformation in Databricks.
+- Staging-to-curated transformation in Databricks (no KPI aggregations).
+- Technical audit persisted in ADLS logs and SQL (`audit.etl_run_log`).
 
----
-
-## 2. Databricks Connection in Airflow
-
-**Admin → Connections → Create New Connection**
-
-Fill in with these values:
-
-| Field | Value |
-|-------|-------|
-| Connection ID | `databricks_hacienda` |
-| Connection Type | `Databricks` |
-| Host | `https://dbc-75d5300e-e786.cloud.databricks.com` |
-| Login | `token` |
-| Password | `<token-databricks>` |
-
-**Save the connection**
-
----
-
-## 3. Variables in Airflow
-
-**Admin → Variables**
-
-Find or create the variable `sqlserver_password`:
-
-| Field | Value |
-|-------|-------|
-| Key | `sqlserver_password` |
-| Val | `StrongPassword123Abc` |
-
-**Save the variable**
-
----
-
-## 4. Environment Variables
-
-Create or verify the `.env` file in the project root:
-```env
-SQLSERVER_SA_PASSWORD=StrongPassword123Abc
+## Repository Structure
+```text
+.
+├── airflow/
+│   ├── dags/
+│   │   ├── 00_create_data_warehouse_dag.py
+│   │   ├── 01_create_schemas_dag.py
+│   │   ├── 02_ingest_deuda_publica_dag.py
+│   │   ├── 03_validate_raw_deuda_publica_dag.py
+│   │   ├── 04_staging_deuda_publica_databricks_dag.py
+│   │   └── 05_curated_deuda_publica_dag.py
+│   ├── plugins/
+│   │   ├── audit/
+│   │   ├── curated/
+│   │   └── deuda_publica/
+│   └── sql/
+│       ├── schemas/
+│       └── warehouse/
+├── docker/
+├── docker-compose.yml
+└── README.md
 ```
 
----
+## DAG Catalog
 
-## 5. Verify Connections
+| DAG ID | Layer / Purpose | Main Output |
+|---|---|---|
+| `00_create_data_warehouse` | Bootstrap DB | `hacienda_dw` database |
+| `01_create_schemas` | Bootstrap schemas and audit tables | `stg`, `mart`, `audit.*` |
+| `02_ingest_deuda_publica_raw` | API ingestion to raw | `raw/deuda_publica/execution_date=YYYY-MM-DD/...` |
+| `03_validate_raw_deuda_publica` | Raw data quality checks | Validation status + logs |
+| `04_staging_deuda_publica_databricks` | Raw -> Staging transform | `staging/deuda_publica/execution_date=YYYY-MM-DD/...` |
+| `05_curated_deuda_publica` | Staging -> Curated transform + audit | `curated/deuda_publica/execution_date=YYYY-MM-DD/...` + audit logs |
 
-From the Airflow UI:
+## Data Layers
 
-- **Admin → Connections**
-- Verify that both connections appear in green
+### Raw
+- Input from source API.
+- JSON files partitioned by `execution_date`.
+- No business transformation.
 
-If they appear in red, check that the values are correct.
+### Staging
+- Databricks transformation from raw.
+- Intermediate normalized entities.
+- Partitioned by `execution_date`.
 
----
+### Curated
+- Business-rule standardization.
+- Null-handling based on domain rules.
+- No KPI/aggregation layer yet.
 
-## 6. Next Step
+## Audit & Observability
 
-Once connections and variables are configured, you can run the DAGs from the UI.
+### ADLS JSON Logs
+- Raw validation logs:
+  - `logs/deuda_publica/execution_date=YYYY-MM-DD/...`
+- Curated run logs:
+  - `logs/deuda_publica/layer=curated/execution_date=YYYY-MM-DD/...`
+
+### SQL Audit
+- `audit.etl_run_log`
+- `audit.pipeline_runs`
+
+## Runtime Prerequisites
+- Docker + Docker Compose.
+- Airflow with Microsoft SQL Server and Databricks providers.
+- Databricks workspace + active cluster.
+- ADLS Gen2 account and containers.
+- SQL Server reachable from Airflow.
+
+## Local Startup
+```bash
+docker compose up -d --build
+```
+Airflow UI: `http://localhost:8080`
+
+## Airflow Setup
+
+### Connections (`Admin -> Connections`)
+1. `sqlserver_hacienda`
+- Type: `Microsoft SQL Server`
+- Host/Port/Schema/Login/Password according to your target environment.
+
+2. `databricks_hacienda`
+- Type: `Databricks`
+- Host: Databricks workspace URL.
+- Login: `token`
+- Password: PAT token.
+
+3. `azure_datalake_conn`
+- Login: Service Principal `client_id`
+- Password: Service Principal `client_secret`
+- Extra JSON:
+```json
+{"tenant_id": "<tenant-id>"}
+```
+
+### Variables (`Admin -> Variables`)
+1. `AZURE_STORAGE_ACCOUNT_URL`  
+Example: `https://<storage-account>.dfs.core.windows.net`
+
+2. `AZURE_FILE_SYSTEM_NAME`  
+Main file system used for raw validation and audit logs.
+
+3. `azure_storage_account`  
+Storage account name only (no protocol).
+
+## Databricks Setup
+- Ensure the cluster configured in DAGs exists and is running.
+- Ensure notebook paths in DAGs are valid in your workspace.
+- Use workspace-neutral paths in your own environment, for example:
+  - `/Workspace/Shared/etl/01_raw_to_stg_deuda_publica`
+  - `/Workspace/Shared/etl/02_stg_to_curated_deuda_publica`
+- Ensure RBAC/access to ADLS for read/write operations in `raw`, `staging`, `curated`, and `logs`.
+
+## Recommended Execution Order
+1. `00_create_data_warehouse`
+2. `01_create_schemas`
+3. `02_ingest_deuda_publica_raw`
+4. `03_validate_raw_deuda_publica`
+5. `04_staging_deuda_publica_databricks`
+6. `05_curated_deuda_publica`
+
+## Validation Checklist
+After running the flow for a given `execution_date`:
+1. Raw files exist in `raw/deuda_publica/execution_date=YYYY-MM-DD/`
+2. Validation DAG succeeds (or fails with explicit quality reason)
+3. Staging data exists in `staging/deuda_publica/execution_date=YYYY-MM-DD/`
+4. Curated data exists in `curated/deuda_publica/execution_date=YYYY-MM-DD/`
+5. ADLS audit logs were written
+6. SQL audit row was inserted into `audit.etl_run_log`
+
+## Troubleshooting
+1. `Path not found` during curated run
+- Check staging data exists for that execution date.
+
+2. Databricks ADLS OAuth errors
+- Check cluster auth configuration and Service Principal permissions.
+
+3. SQL audit insertion errors
+- Run `01_create_schemas` and verify `audit.etl_run_log` exists.
+
+## Security Note
+Do not store secrets, tokens, or personal identifiers in source-controlled documentation.
