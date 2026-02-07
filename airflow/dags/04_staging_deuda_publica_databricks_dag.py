@@ -23,7 +23,7 @@ with DAG(
                     "notebook_task": {
                         "notebook_path": "/Users/samu_junior95@hotmail.com/01_raw_to_stg_deuda_publica",
                         "base_parameters": {
-                            "execution_date": "2026-01-22",
+                            "execution_date": "2026-02-06", # fecha hardcodeado
                             "raw_container": "raw",
                             "staging_container": "staging",
                             "storage_account": "{{ var.value.azure_storage_account }}",
