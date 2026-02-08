@@ -8,7 +8,7 @@ from airflow.utils.trigger_rule import TriggerRule
 from curated.curated_audit_service import CuratedRunAuditor
 
 # Constantes de configuración del DAG curated que definen identificadores de flujo, dataset, capa y task de Databricks
-DAG_ID = "05_curated_deuda_publica"
+DAG_ID = "06_curated_deuda_publica"
 DATASET_NAME = "deuda_publica"
 LAYER_NAME = "curated"
 DATABRICKS_TASK_ID = "run_staging_to_curated"

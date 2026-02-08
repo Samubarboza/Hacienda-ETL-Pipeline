@@ -62,7 +62,7 @@ def ingest(**context):
 
 
 with DAG(
-    dag_id="02_ingest_deuda_publica_raw",
+    dag_id="03_ingest_deuda_publica_raw",
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
