@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1040" viewBox="0 0 1700 1040" role="img" aria-labelledby="title desc">
   <title id="title">Hacienda ETL Flow - Current Architecture</title>
-  <desc id="desc">Current pipeline from API to raw, staging and curated with Airflow, Databricks and audit outputs.</desc>
+  <desc id="desc">Current pipeline from ODMH API to SQL warehouse with Airflow orchestration, Databricks transformations, and ADLS/SQL auditing.</desc>
 
   <defs>
     <style>
@@ -9,15 +9,16 @@
       .label { font: 600 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
       .small { font: 500 13px 'Segoe UI', Arial, sans-serif; fill: #334155; }
       .box { stroke: #1e293b; stroke-width: 2; rx: 12; }
-      .orchestrator { fill: #e0f2fe; }
+      .orchestrator { fill: #dbeafe; }
       .source { fill: #fff7ed; }
       .raw { fill: #fee2e2; }
-      .quality { fill: #fde68a; }
-      .staging { fill: #dbeafe; }
+      .quality { fill: #fef3c7; }
+      .staging { fill: #e0f2fe; }
       .curated { fill: #dcfce7; }
-      .audit { fill: #ede9fe; }
-      .infra { fill: #f1f5f9; }
-      .line { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .warehouse { fill: #ede9fe; }
+      .audit { fill: #f3e8ff; }
+      .infra { fill: #e2e8f0; }
+      .line { stroke: #334155; stroke-width: 2.6; fill: none; marker-end: url(#arrow); }
       .line-dashed { stroke: #64748b; stroke-width: 2.2; stroke-dasharray: 8 6; fill: none; marker-end: url(#arrow); }
     </style>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -25,104 +26,113 @@
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1600" height="980" fill="#f8fafc"/>
+  <rect x="0" y="0" width="1700" height="1040" fill="#f8fafc" />
 
-  <text x="60" y="70" class="title">Hacienda ETL Pipeline - Current Architecture (Up to Curated)</text>
-  <text x="60" y="105" class="subtitle">Implemented flow: API ingestion, raw validation, staging and curated transformation, ADLS/SQL auditing</text>
+  <text x="50" y="68" class="title">Hacienda ETL Pipeline - Current Architecture (Up to Warehouse)</text>
+  <text x="50" y="102" class="subtitle">Implemented flow: API ingestion, raw validation, staging/curated/warehouse transformations, ADLS + SQL auditing</text>
 
   <!-- Orchestrator -->
-  <rect x="520" y="150" width="560" height="90" class="box orchestrator"/>
-  <text x="560" y="205" class="label">Airflow Orchestration (DAG 00 -> DAG 05)</text>
+  <rect x="330" y="125" width="1040" height="90" class="box orchestrator" />
+  <text x="368" y="180" class="label">Airflow Orchestration (DAG 00 - DAG 07)</text>
 
-  <!-- Source -->
-  <rect x="60" y="320" width="230" height="110" class="box source"/>
-  <text x="90" y="365" class="label">ODMH API</text>
-  <text x="90" y="392" class="small">Deuda Publica source</text>
+  <!-- Main flow -->
+  <rect x="40" y="300" width="220" height="130" class="box source" />
+  <text x="72" y="350" class="label">ODMH API</text>
+  <text x="72" y="376" class="small">deuda_publica source</text>
+  <text x="72" y="402" class="small">Input endpoint</text>
 
-  <!-- Raw -->
-  <rect x="360" y="300" width="300" height="140" class="box raw"/>
-  <text x="390" y="350" class="label">ADLS Raw</text>
-  <text x="390" y="376" class="small">deuda_publica/execution_date=YYYY-MM-DD</text>
-  <text x="390" y="402" class="small">DAG 02 ingest</text>
+  <rect x="300" y="300" width="220" height="130" class="box raw" />
+  <text x="332" y="350" class="label">ADLS Raw</text>
+  <text x="332" y="376" class="small">DAG 03 ingestion</text>
+  <text x="332" y="402" class="small">execution_date + request_hash</text>
 
-  <!-- Validation -->
-  <rect x="740" y="300" width="300" height="140" class="box quality"/>
-  <text x="770" y="350" class="label">Raw Validation</text>
-  <text x="770" y="376" class="small">DAG 03 quality checks</text>
-  <text x="770" y="402" class="small">Fail-fast on invalid raw</text>
+  <rect x="560" y="300" width="220" height="130" class="box quality" />
+  <text x="592" y="350" class="label">Raw Validation</text>
+  <text x="592" y="376" class="small">DAG 04</text>
+  <text x="592" y="402" class="small">Fail-fast quality checks</text>
 
-  <!-- Staging -->
-  <rect x="1120" y="300" width="300" height="140" class="box staging"/>
-  <text x="1150" y="350" class="label">ADLS Staging</text>
-  <text x="1150" y="376" class="small">raw -> staging with Databricks</text>
-  <text x="1150" y="402" class="small">DAG 04</text>
+  <rect x="820" y="300" width="220" height="130" class="box staging" />
+  <text x="852" y="350" class="label">ADLS Staging</text>
+  <text x="852" y="376" class="small">DAG 05 (Databricks)</text>
+  <text x="852" y="402" class="small">raw -&gt; staging</text>
 
-  <!-- Curated -->
-  <rect x="1120" y="520" width="300" height="140" class="box curated"/>
-  <text x="1150" y="570" class="label">ADLS Curated</text>
-  <text x="1150" y="596" class="small">staging -> curated with business rules</text>
-  <text x="1150" y="622" class="small">DAG 05</text>
+  <rect x="1080" y="300" width="220" height="130" class="box curated" />
+  <text x="1112" y="350" class="label">ADLS Curated</text>
+  <text x="1112" y="376" class="small">DAG 06 (Databricks)</text>
+  <text x="1112" y="402" class="small">staging -&gt; curated</text>
+
+  <rect x="1340" y="300" width="300" height="130" class="box warehouse" />
+  <text x="1372" y="350" class="label">SQL Warehouse</text>
+  <text x="1372" y="376" class="small">DAG 07 model + load</text>
+  <text x="1372" y="402" class="small">dim_* + fact_deuda_corte</text>
 
   <!-- Databricks -->
-  <rect x="740" y="520" width="300" height="140" class="box infra"/>
-  <text x="770" y="570" class="label">Databricks Notebooks</text>
-  <text x="770" y="596" class="small">01_raw_to_stg_deuda_publica</text>
-  <text x="770" y="622" class="small">02_stg_to_curated_deuda_publica</text>
+  <rect x="820" y="500" width="820" height="150" class="box infra" />
+  <text x="852" y="550" class="label">Databricks Notebooks</text>
+  <text x="852" y="576" class="small">01_raw_to_stg_deuda_publica</text>
+  <text x="852" y="602" class="small">02_stg_to_curated_deuda_publica.py</text>
+  <text x="852" y="628" class="small">03_curated_to_warehouse_deuda_publica</text>
 
-  <!-- ADLS Logs -->
-  <rect x="360" y="700" width="300" height="140" class="box audit"/>
-  <text x="390" y="750" class="label">ADLS Logs (JSON)</text>
-  <text x="390" y="776" class="small">logs/deuda_publica/...</text>
-  <text x="390" y="802" class="small">validation + curated audit</text>
+  <!-- Audit and bootstrap -->
+  <rect x="300" y="740" width="420" height="170" class="box audit" />
+  <text x="332" y="790" class="label">ADLS Logs (JSON)</text>
+  <text x="332" y="816" class="small">logs/deuda_publica/execution_date=...</text>
+  <text x="332" y="842" class="small">logs/deuda_publica/layer=curated/execution_date=...</text>
+  <text x="332" y="868" class="small">logs/deuda_publica/layer=warehouse/execution_date=...</text>
 
-  <!-- SQL Audit -->
-  <rect x="740" y="700" width="300" height="140" class="box audit"/>
-  <text x="770" y="750" class="label">SQL Audit</text>
-  <text x="770" y="776" class="small">audit.etl_run_log</text>
-  <text x="770" y="802" class="small">audit.pipeline_runs</text>
+  <rect x="760" y="740" width="420" height="170" class="box audit" />
+  <text x="792" y="790" class="label">SQL Audit</text>
+  <text x="792" y="816" class="small">audit.etl_run_log</text>
+  <text x="792" y="842" class="small">audit.pipeline_runs</text>
+  <text x="792" y="868" class="small">Covers validation + curated + warehouse</text>
 
-  <!-- Bootstrap SQL -->
-  <rect x="1120" y="700" width="300" height="140" class="box infra"/>
-  <text x="1150" y="750" class="label">SQL Bootstrap</text>
-  <text x="1150" y="776" class="small">DAG 00 / DAG 01</text>
-  <text x="1150" y="802" class="small">warehouse + schemas + audit tables</text>
+  <rect x="1220" y="740" width="420" height="170" class="box infra" />
+  <text x="1252" y="790" class="label">SQL Bootstrap</text>
+  <text x="1252" y="816" class="small">DAG 00: create hacienda_dw</text>
+  <text x="1252" y="842" class="small">DAG 01: schemas + audit tables</text>
+  <text x="1252" y="868" class="small">DAG 02: master key bootstrap</text>
 
   <!-- Main flow arrows -->
-  <path d="M290 375 L360 375" class="line"/>
-  <path d="M660 375 L740 375" class="line"/>
-  <path d="M1040 375 L1120 375" class="line"/>
+  <path d="M260 365 L300 365" class="line" />
+  <path d="M520 365 L560 365" class="line" />
+  <path d="M780 365 L820 365" class="line" />
+  <path d="M1040 365 L1080 365" class="line" />
+  <path d="M1300 365 L1340 365" class="line" />
 
-  <!-- Databricks connections -->
-  <path d="M1038 560 L1120 560" class="line"/>
-  <path d="M890 520 L890 440" class="line-dashed"/>
-  <path d="M960 520 L1120 440" class="line-dashed"/>
-
-  <!-- Curated data path -->
-  <path d="M1270 440 L1270 520" class="line"/>
+  <!-- Databricks relation -->
+  <path d="M930 430 L930 500" class="line-dashed" />
+  <path d="M1190 430 L1190 500" class="line-dashed" />
+  <path d="M1490 430 L1490 500" class="line-dashed" />
 
   <!-- Audit arrows -->
-  <path d="M890 440 L890 700" class="line-dashed"/>
-  <path d="M890 660 L660 760" class="line-dashed"/>
-  <path d="M1270 660 L1040 760" class="line-dashed"/>
+  <path d="M670 430 L500 740" class="line-dashed" />
+  <path d="M1190 430 L620 740" class="line-dashed" />
+  <path d="M1190 430 L960 740" class="line-dashed" />
+  <path d="M1490 430 L970 740" class="line-dashed" />
+
+  <!-- Bootstrap prerequisite -->
+  <path d="M1430 740 L1490 430" class="line-dashed" />
 
   <!-- Orchestrator links -->
-  <path d="M800 240 L800 300" class="line-dashed"/>
-  <path d="M960 240 L1270 300" class="line-dashed"/>
-  <path d="M640 240 L460 300" class="line-dashed"/>
+  <path d="M850 215 L850 300" class="line-dashed" />
+  <path d="M520 215 L150 300" class="line-dashed" />
+  <path d="M1180 215 L1490 300" class="line-dashed" />
 
   <!-- Legend -->
-  <rect x="60" y="880" width="16" height="16" class="box source"/>
-  <text x="84" y="894" class="small">Source</text>
-  <rect x="180" y="880" width="16" height="16" class="box raw"/>
-  <text x="204" y="894" class="small">Raw</text>
-  <rect x="280" y="880" width="16" height="16" class="box quality"/>
-  <text x="304" y="894" class="small">Validation</text>
-  <rect x="420" y="880" width="16" height="16" class="box staging"/>
-  <text x="444" y="894" class="small">Staging</text>
-  <rect x="540" y="880" width="16" height="16" class="box curated"/>
-  <text x="564" y="894" class="small">Curated</text>
-  <rect x="660" y="880" width="16" height="16" class="box audit"/>
-  <text x="684" y="894" class="small">Audit</text>
-  <rect x="760" y="880" width="16" height="16" class="box orchestrator"/>
-  <text x="784" y="894" class="small">Orchestration</text>
+  <rect x="50" y="970" width="16" height="16" class="box source" />
+  <text x="74" y="984" class="small">Source</text>
+  <rect x="160" y="970" width="16" height="16" class="box raw" />
+  <text x="184" y="984" class="small">Raw</text>
+  <rect x="260" y="970" width="16" height="16" class="box quality" />
+  <text x="284" y="984" class="small">Validation</text>
+  <rect x="390" y="970" width="16" height="16" class="box staging" />
+  <text x="414" y="984" class="small">Staging</text>
+  <rect x="500" y="970" width="16" height="16" class="box curated" />
+  <text x="524" y="984" class="small">Curated</text>
+  <rect x="610" y="970" width="16" height="16" class="box warehouse" />
+  <text x="634" y="984" class="small">Warehouse</text>
+  <rect x="740" y="970" width="16" height="16" class="box audit" />
+  <text x="764" y="984" class="small">Audit</text>
+  <rect x="840" y="970" width="16" height="16" class="box orchestrator" />
+  <text x="864" y="984" class="small">Orchestration</text>
 </svg>
