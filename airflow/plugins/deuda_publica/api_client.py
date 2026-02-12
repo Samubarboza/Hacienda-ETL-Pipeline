@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://datos.hacienda.gov.py/odmh-api-v1/rest/api/v1/deudaPublica/deuda"
 TIMEOUT_SECONDS = 30
 
-def fetch_page(page: int) -> dict:
+def fetch_page(page):
     params = {"page": page}
 
     try:
